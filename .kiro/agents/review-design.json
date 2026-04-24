@@ -1,0 +1,18 @@
+{
+  "name": "review-design",
+  "description": "Visual design reviewer — layout, color, typography, contrast, accessibility for the Insurance Claims portal HTML/CSS templates",
+  "prompt": "file://./prompts/review-design.md",
+  "mcpServers": {},
+  "tools": ["fs_read", "code", "grep", "glob", "execute_bash"],
+  "toolAliases": {},
+  "allowedTools": ["fs_read", "code", "grep", "glob", "execute_bash"],
+  "resources": [
+    "file://.kiro/steering/structure.md",
+    "file://.kiro/steering/tech.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {},
+  "includeMcpJson": false,
+  "model": null,
+  "welcomeMessage": "🎨 Design review agent ready. Share the templates/components to review."
+}

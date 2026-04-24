@@ -1,0 +1,18 @@
+{
+  "name": "research-edge-cases",
+  "description": "Surfaces failure modes, operational gotchas, and production risks before implementation",
+  "prompt": "file://./prompts/research-edge-cases.md",
+  "mcpServers": {},
+  "tools": ["fs_read", "grep", "glob", "web_search"],
+  "toolAliases": {},
+  "allowedTools": ["fs_read", "grep", "glob", "web_search"],
+  "resources": [
+    "file://.kiro/steering/tech.md",
+    "file://.kiro/steering/memory.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {},
+  "includeMcpJson": false,
+  "model": null,
+  "welcomeMessage": "⚠️ Edge case research agent ready. What are we stress-testing?"
+}

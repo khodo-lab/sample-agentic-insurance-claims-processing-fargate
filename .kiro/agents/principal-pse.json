@@ -1,0 +1,19 @@
+{
+  "name": "principal-pse",
+  "description": "Principal Software Engineer — challenges architecture decisions, coupling risks, and complexity before implementation starts",
+  "prompt": "file://./prompts/principal-pse.md",
+  "mcpServers": {},
+  "tools": ["fs_read", "grep", "glob", "web_search"],
+  "toolAliases": {},
+  "allowedTools": ["fs_read", "grep", "glob", "web_search"],
+  "resources": [
+    "file://.kiro/steering/tech.md",
+    "file://.kiro/steering/structure.md",
+    "file://.kiro/steering/memory.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {},
+  "includeMcpJson": false,
+  "model": null,
+  "welcomeMessage": "⚙️ Principal Engineer ready. Show me the design and I'll find what breaks."
+}

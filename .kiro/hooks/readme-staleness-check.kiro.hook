@@ -1,0 +1,11 @@
+{
+  "name": "README Staleness Check",
+  "description": "Checks if README sections may be stale after implementation work",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if README.md needs updating based on recent changes:\n1. Run git diff main --name-only to see what changed\n2. If Terraform/infrastructure changed: verify the Architecture and Quick Start sections are current\n3. If Python/FastAPI changed: verify the Technology Stack and API sections\n4. If Kubernetes manifests changed: verify the Deployment Options and Kubernetes Monitoring sections\n5. If new environment variables added: verify the Configuration section\n6. If scripts changed: verify the Quick Start and Deployment Options sections\n7. Report which sections (if any) appear stale and suggest specific updates"
+  }
+}

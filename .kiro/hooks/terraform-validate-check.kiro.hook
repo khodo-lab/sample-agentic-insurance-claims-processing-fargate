@@ -1,0 +1,13 @@
+{
+  "name": "Terraform Validate Check",
+  "description": "Runs terraform validate after Terraform files are modified",
+  "when": {
+    "type": "fileEdited",
+    "filePattern": "infrastructure/terraform/**/*.tf"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd infrastructure/terraform && terraform validate 2>&1 | tail -5",
+    "timeout": 60
+  }
+}

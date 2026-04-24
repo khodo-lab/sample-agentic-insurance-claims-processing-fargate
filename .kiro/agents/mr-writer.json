@@ -1,0 +1,17 @@
+{
+  "name": "mr-writer",
+  "description": "Generates GitHub Pull Request descriptions from git history",
+  "prompt": "file://./prompts/mr-writer.md",
+  "mcpServers": {},
+  "tools": ["fs_read", "execute_bash", "grep", "glob"],
+  "toolAliases": {},
+  "allowedTools": ["fs_read", "grep", "glob"],
+  "resources": [
+    "file://.github/PULL_REQUEST_TEMPLATE.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {},
+  "includeMcpJson": false,
+  "model": null,
+  "welcomeMessage": "📝 PR writer ready. I'll generate a description from your branch history."
+}

@@ -1,0 +1,18 @@
+{
+  "name": "research-aws-constraints",
+  "description": "Identifies AWS IAM requirements, quotas, regional availability, EKS limits, and Terraform constraints before building",
+  "prompt": "file://./prompts/research-aws-constraints.md",
+  "mcpServers": {},
+  "tools": ["fs_read", "grep", "glob", "web_search"],
+  "toolAliases": {},
+  "allowedTools": ["fs_read", "grep", "glob", "web_search"],
+  "resources": [
+    "file://.kiro/steering/tech.md",
+    "file://.kiro/steering/memory.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {},
+  "includeMcpJson": false,
+  "model": null,
+  "welcomeMessage": "☁️ AWS constraints research agent ready. What are we checking?"
+}
