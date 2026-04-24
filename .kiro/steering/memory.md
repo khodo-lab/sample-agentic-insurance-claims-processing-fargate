@@ -6,51 +6,69 @@ Persistent learnings loaded every session.
 
 ## ⚡ Core — Always Active
 
-These caused issues or will recur on every session.
+High-signal facts that will bite you if forgotten. Keep this under 15 entries.
 
-- **Ollama model must be running before agents start** — `langgraph_agentic_coordinator.py` calls Ollama at startup. If Ollama pod is not ready, coordinator crashes with connection refused. Check `kubectl get pods -n insurance-claims -l app=ollama` first.
-- **MongoDB auth uses Secrets Manager** — credentials are in `infrastructure/kubernetes/external-secrets.yaml`. Never hardcode MongoDB URI. Use `MONGODB_URI` env var injected via ExternalSecret.
-- **Terraform state is remote (S3 + DynamoDB lock)** — `infrastructure/terraform/backend.tf`. Always `terraform init` before plan/apply on a new machine.
-- **EKS cluster name is `agentic-eks-cluster`** — set `EKS_CLUSTER_NAME` or use `aws eks update-kubeconfig --name agentic-eks-cluster --region $AWS_REGION`.
-- **Docker images must be pushed to ECR before kubectl apply** — `scripts/build-docker-images.sh` handles ECR login + build + push. Never apply Kubernetes manifests with stale image tags.
-- **Karpenter manages node scaling** — do not manually scale node groups. Karpenter NodePools are in `infrastructure/terraform/karpenter-nodepools.tf`.
-- **LangGraph agents use shared Redis for state** — `infrastructure/kubernetes/shared-memory.yaml`. Redis is not persistent; agent state is ephemeral across pod restarts.
+- **GitHub repo**: `khodo-lab/sample-agentic-insurance-claims-processing-fargate` — GitHub user `hodok-aws`
+- **AWS account**: `597088050001`, region `us-west-2` — credentials via Isengard (`hodok-Isengard` assumed role)
+- **Target architecture** (decided 2026-04-24): CDK TypeScript + Fargate (2 services) + DynamoDB + ElastiCache Redis + Strands/AgentCore (Claude Sonnet 4.5). See ADRs 01–04 in `docs/adr/`.
+- **Issue dependency chain**: #2 (CDK) → #3 (Fargate) + #4 (DynamoDB) in parallel → #5 (Strands/AgentCore) → #6 (GitHub Actions for new stack). Issue #7 (GitHub Actions for current stack) is unblocked and can start immediately.
 - **Never commit directly to `main`** — always branch + PR.
-- **`scripts/deploy.sh` is the canonical deploy entry point** — it handles Terraform + Docker + Kubernetes in the correct order. Do not run steps manually unless debugging.
-- **ALB URL is the only public entry point** — get it with `kubectl get ingress -n insurance-claims`. All portals are sub-paths: `/claimant`, `/adjuster`, `/siu`, `/supervisor`.
+- **Ollama is gone** — replaced by Claude Sonnet 4.5 on Bedrock AgentCore. Do not add Ollama back.
+- **MongoDB is gone** — replaced by DynamoDB. Do not add Motor/PyMongo back.
+- **Terraform is gone** — replaced by CDK TypeScript. Do not add Terraform back.
+- **2 ECS services only**: `web-interface` (FastAPI portals) and `coordinator` (agent processing). No more than 2 services unless explicitly re-decided.
 
 ---
 
-## 📚 Archive Index
+## 📚 Topical Memory
 
-Check the relevant section before working in that area.
+Grouped by area. Check the relevant section before working in that area.
 
-### Infrastructure & Terraform
-- EKS cluster provisioned via `infrastructure/terraform/eks.tf`
-- Karpenter NodePools in `infrastructure/terraform/karpenter-nodepools.tf`
-- Secrets Manager secrets defined in `infrastructure/terraform/secrets-manager.tf`
-- ALB Ingress Controller managed via `infrastructure/terraform/addons.tf`
+### Architecture Decisions (ADRs)
+- `docs/adr/20260424-01-strands-bedrock-agentcore.md` — Why Strands + AgentCore over LangGraph/Ollama
+- `docs/adr/20260424-02-eks-to-fargate.md` — Why Fargate over EKS, 2-service consolidation
+- `docs/adr/20260424-03-mongodb-to-dynamodb.md` — Why DynamoDB over MongoDB/DocumentDB
+- `docs/adr/20260424-04-terraform-to-cdk.md` — Why CDK TypeScript over Terraform
 
-### Kubernetes
-- Namespace: `insurance-claims`
-- Key deployments: coordinator, web-interface, claims-simulator, policy-agent, mongodb, redis, ollama
-- ExternalSecrets operator syncs Secrets Manager → K8s secrets
-- Network policies in `infrastructure/kubernetes/network-policies.yaml`
+### Open Issues (as of 2026-04-24)
+- #2: Terraform → CDK TypeScript (unblocked, start here)
+- #3: EKS → Fargate + ElastiCache Redis (blocked by #2)
+- #4: MongoDB → DynamoDB (blocked by #2)
+- #5: LangGraph/Ollama → Strands + AgentCore (blocked by #2, #3)
+- #6: GitHub Actions for new CDK/Fargate stack (blocked by #2, #3)
+- #7: GitHub Actions + OIDC for current stack (unblocked — deploy what exists today)
+- PR #1: Initial Kiro configuration (open, needs merge)
+
+### Kiro Configuration
+- Ported from `titan-daws` project and adapted for Python/FastAPI/LangGraph/EKS stack
+- All steering, agents, skills, hooks in `.kiro/`
+- `.kiro/context/` and `.kiro/telemetry/` are gitignored (local session state only)
+- Team reference: "The Team" (not "The Titan Team")
+
+### Infrastructure
+- Current stack: Terraform + EKS + MongoDB + Redis + Ollama (Kubernetes pods)
+- Target stack: CDK TypeScript + Fargate + DynamoDB + ElastiCache + Bedrock AgentCore
+- CDK bootstrap needed: `cdk bootstrap aws://597088050001/us-west-2`
+- OIDC trust: `repo:khodo-lab/sample-agentic-insurance-claims-processing-fargate:ref:refs/heads/main`
 
 ### Application
-- Main coordinator: `applications/insurance-claims-processing/src/langgraph_agentic_coordinator.py`
-- Web interface (FastAPI): `applications/insurance-claims-processing/src/web_interface.py`
-- Persona portals: `applications/insurance-claims-processing/src/persona_web_interface.py`
-- Database models: `applications/insurance-claims-processing/src/database_models.py`
-- Fraud agent: `applications/insurance-claims-processing/src/langgraph_fraud_agent.py`
-- Policy agent: `applications/insurance-claims-processing/src/langgraph_policy_agent.py`
+- Main FastAPI app: `applications/insurance-claims-processing/src/web_interface.py`
+- Portals: `/claimant`, `/adjuster`, `/siu`, `/supervisor`
+- Agent files (to be replaced): `langgraph_*_agent.py`
+- Database models (to be replaced): `database_models.py` (Motor/PyMongo → boto3 DynamoDB)
 
-### Monitoring
-- CloudWatch Container Insights: `infrastructure/kubernetes/cloudwatch-observability.yaml`
-- Custom metrics via `applications/insurance-claims-processing/src/shared/observability.py`
+### Strands / AgentCore
+- Model: `us.anthropic.claude-sonnet-4-5-20251101-v1:0` (cross-region inference profile)
+- AgentCore image must be `linux/arm64`
+- AgentCore cold start ~30s — use PUBLIC network mode (VPC mode cold start >30s)
+- See `.kiro/steering/memory.md` in titan-daws for detailed AgentCore gotchas if needed
 
 ---
 
-## Stakeholder Preferences
+## Stakeholder Preferences (2026-04-24)
 
-*(Add decisions here as they are made)*
+- **LLM**: Claude Sonnet 4.5 on Bedrock AgentCore via Strands (not Ollama, not LangGraph)
+- **Shared state**: ElastiCache Redis (not DynamoDB for state)
+- **Service count**: 2 consolidated ECS services (not 4)
+- **IaC**: CDK TypeScript (not Terraform)
+- **Deploy now**: Issue #7 — get current stack deploying via GitHub Actions + OIDC as a baseline
