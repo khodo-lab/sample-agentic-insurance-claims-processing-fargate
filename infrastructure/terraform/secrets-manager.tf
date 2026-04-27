@@ -16,9 +16,7 @@ resource "aws_secretsmanager_secret" "mongodb_credentials" {
   description             = "MongoDB credentials for insurance claims processing"
   recovery_window_in_days = 0 # Force-delete immediately (was in deletion window)
 
-  tags = merge(local.secret_tags, {
-    Purpose = "MongoDB Credentials"
-  })
+  tags = local.secret_tags
 }
 
 # Secret Version with MongoDB credentials
@@ -55,10 +53,7 @@ resource "aws_secretsmanager_secret" "mongodb_credentials_encrypted" {
   kms_key_id              = aws_kms_key.secrets_encryption.arn
   recovery_window_in_days = 0 # Force-delete immediately if needed
 
-  tags = merge(local.secret_tags, {
-    Purpose   = "MongoDB Credentials (Encrypted)"
-    ManagedBy = "terraform"
-  })
+  tags = local.secret_tags
 }
 
 resource "aws_secretsmanager_secret_version" "mongodb_credentials_encrypted_version" {
