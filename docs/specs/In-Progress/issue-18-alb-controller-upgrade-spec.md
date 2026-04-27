@@ -319,17 +319,34 @@ graph LR
 - **Wave 3**: Task 4 — merge and deploy
 - **Wave 4**: Task 5 — validation
 
-### Detailed Task Definitions
+### Review Findings Log (2026-04-27)
+
+| # | Agent | Severity | Finding | Resolution |
+|---|-------|----------|---------|------------|
+| 1 | maintainability | 🔴 | Missing TODO(issue #2) on data source | ✅ Fixed — added TODO comment |
+| 2 | maintainability | 🟡 | Comment missing migration context | ✅ Fixed — added TEMPORARY note |
+| 3 | performance | 🟡 | `requests.memory` 256Mi undersized for v2.17.x (idle RSS 180–250Mi) | ✅ Fixed — raised to 320Mi |
+| 4 | principal-pse | 🟡 | CRD kubectl apply used `ref=master` — non-deterministic | ✅ Fixed — pinned to `ref=aws-load-balancer-controller-1.17.1` |
+| 5 | security | 🟡 | `atomic=false`/`cleanup_on_fail=false` risk if upgrade fails | ⚠️ Accepted — pre-existing config, EOL stack. Post-upgrade: consider reverting to `atomic=true` once confirmed stable |
+| 6 | principal-pse | 🟡 | CRD pre-apply not in CI/reproducible artifact | ✅ Documented in Task 1 with reproducibility note |
+| 7 | maintainability | 🟢 | Data source placement (nit — co-locate with Karpenter policy) | Deferred — low value for EOL stack |
+
+
 
 ---
 
 **Task 1 — Apply updated CRDs (manual, run locally before merge)**
 
 ```bash
-kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+# Pin to the chart version tag for determinism (not ref=master)
+kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=aws-load-balancer-controller-1.17.1"
 ```
 
-Verify: `kubectl get crds | grep elbv2` should show 3 CRDs; `kubectl get crds | grep aga` should show 1 CRD.
+✅ **Already executed** — 2 CRDs created (albtargetcontrolconfigs, globalaccelerators), 2 updated (ingressclassparams, targetgroupbindings).
+
+Verify: `kubectl get crds | grep -E "elbv2|aga"` should show 3 elbv2 CRDs + 1 aga CRD.
+
+> ⚠️ **Reproducibility note:** If the cluster is recreated, this step must be re-run before `terraform apply`. It is not automated in CI. Add to the bootstrap runbook in README.
 
 Acceptance: All 4 CRDs present in cluster.
 

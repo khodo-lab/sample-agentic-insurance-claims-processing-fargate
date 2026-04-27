@@ -34,14 +34,14 @@ class TestAlbControllerChartVersion:
             f"chart_version must be 1.17.1, got {match.group(1)}"
 
     def test_old_chart_version_not_present_in_lbc_block(self):
-        """The old chart version 1.8.1 must not be in the LBC block."""
+        """The old chart version 1.8.1 must not be the active value in the LBC block."""
         content = _read_addons()
         lbc_section = content[content.find("aws_load_balancer_controller"):]
-        # Get just the LBC block (up to the next top-level key)
-        lbc_block_end = lbc_section.find("\n  }", 100)
-        lbc_block = lbc_section[:lbc_block_end + 4] if lbc_block_end > 0 else lbc_section[:500]
-        assert "1.8.1" not in lbc_block, \
-            "Old chart version 1.8.1 must be replaced with 1.17.1"
+        # Check the actual chart_version value, not comments
+        match = re.search(r'chart_version\s*=\s*"([^"]+)"', lbc_section)
+        assert match, "chart_version not found"
+        assert match.group(1) != "1.8.1", \
+            "chart_version must not be 1.8.1 (old version with CVEs)"
 
 
 class TestAlbControllerIamPolicy:

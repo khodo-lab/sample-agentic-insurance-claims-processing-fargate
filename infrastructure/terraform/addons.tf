@@ -7,6 +7,22 @@ data "aws_ecrpublic_authorization_token" "token" {
 }
 
 ###############################################################
+# ALB Controller Extra IAM Policy
+# v2.17.1 requires ec2:DescribeRouteTables which is not in the
+# policy bundled with eks-blueprints-addons ~> 1.20.
+# TEMPORARY: This stack is being replaced by CDK/Fargate (issue #2).
+# TODO(issue #2): Remove when migrated to CDK/Fargate.
+###############################################################
+
+data "aws_iam_policy_document" "alb_controller_extra_policy" {
+  statement {
+    effect    = "Allow"
+    actions   = ["ec2:DescribeRouteTables"]
+    resources = ["*"]
+  }
+}
+
+###############################################################
 # IRSA for EBS CSI Driver
 ###############################################################
 
@@ -123,12 +139,15 @@ module "eks_blueprints_addons" {
   #---------------------------------------
   enable_aws_load_balancer_controller = true
   aws_load_balancer_controller = {
-    chart_version   = "1.8.1"
-    wait            = false # Disable wait to prevent timeout
-    timeout         = 600   # Reduced timeout to 10 minutes
-    atomic          = false # Disable atomic to allow partial installation
-    cleanup_on_fail = false # Keep resources for debugging
+    chart_version   = "1.17.1" # Upgraded from 1.8.1 (v2.8.1) to resolve Inspector OS CVE finding (#18)
+    wait            = false    # Disable wait to prevent timeout
+    timeout         = 600      # Reduced timeout to 10 minutes
+    atomic          = false    # Disable atomic to allow partial installation
+    cleanup_on_fail = false    # Keep resources for debugging
     max_history     = 3
+    source_policy_documents = [
+      data.aws_iam_policy_document.alb_controller_extra_policy.json
+    ]
     set = [
       {
         name  = "enableServiceMutatorWebhook"
@@ -148,7 +167,7 @@ module "eks_blueprints_addons" {
       },
       {
         name  = "resources.requests.memory"
-        value = "256Mi" # Reduced memory requests
+        value = "320Mi" # Raised from 256Mi — v2.17.x idle RSS is 180-250Mi
       },
       {
         name  = "replicaCount"
