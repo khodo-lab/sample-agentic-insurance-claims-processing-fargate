@@ -13,8 +13,8 @@ locals {
   # Availability zones
   azs = slice(data.aws_availability_zones.available.names, 0, 3)
 
-  # Common tags for all resources
-  tags = {
+  # Base tags applied to all resources via provider default_tags (no k8s-specific keys)
+  base_tags = {
     Project     = var.project_name
     Environment = var.environment
     Region      = var.region
@@ -23,22 +23,16 @@ locals {
     Owner       = "platform-team"
     CostCenter  = "ai-ml"
     UniqueId    = random_string.cluster_suffix.result
+  }
 
-    # EKS and Karpenter discovery tags
+  # Full tags including EKS and Karpenter discovery tags (use on EKS/Karpenter resources only)
+  tags = merge(local.base_tags, {
     "kubernetes.io/cluster/${local.cluster_name}" = "owned"
     "karpenter.sh/discovery"                      = local.cluster_name
-  }
+  })
 
   # Tags safe for Secrets Manager (strips k8s tags — SM rejects keys with '/' or '.')
-  secret_tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Region      = var.region
-    ManagedBy   = "terraform"
-    Purpose     = "insurance-agentic-ai"
-    Owner       = "platform-team"
-    CostCenter  = "ai-ml"
-  }
+  secret_tags = local.base_tags
 
 
 }

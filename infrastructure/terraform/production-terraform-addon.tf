@@ -96,9 +96,7 @@ resource "aws_secretsmanager_secret" "langgraph_secrets" {
   description             = "Secrets for LangGraph insurance system"
   recovery_window_in_days = 0 # Force-delete immediately (was in deletion window)
 
-  tags = merge(local.secret_tags, {
-    ManagedBy = "terraform"
-  })
+  tags = local.secret_tags
 }
 
 resource "aws_secretsmanager_secret_version" "langgraph_secrets_version" {
