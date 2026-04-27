@@ -20,7 +20,7 @@ spec:
         karpenter.sh/nodepool: cpu-nodepool
       containers:
       - name: external-integrations
-        image: 123255318457.dkr.ecr.us-west-2.amazonaws.com/insurance-claims/external-integrations:latest
+        image: ${ECR_REGISTRY}/insurance-claims/external-integrations:${IMAGE_TAG}
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000

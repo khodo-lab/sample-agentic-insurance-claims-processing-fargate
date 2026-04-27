@@ -20,7 +20,7 @@ spec:
         karpenter.sh/nodepool: cpu-nodepool
       containers:
       - name: web-interface
-        image: 123255318457.dkr.ecr.us-west-2.amazonaws.com/insurance-claims/web-interface:latest
+        image: ${ECR_REGISTRY}/insurance-claims/web-interface:${IMAGE_TAG}
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000

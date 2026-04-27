@@ -20,7 +20,7 @@ spec:
         karpenter.sh/nodepool: cpu-nodepool
       containers:
       - name: shared-memory
-        image: 123255318457.dkr.ecr.us-west-2.amazonaws.com/insurance-claims/shared-memory:latest
+        image: ${ECR_REGISTRY}/insurance-claims/shared-memory:${IMAGE_TAG}
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000
