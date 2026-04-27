@@ -126,8 +126,11 @@ class TestAlbControllerPreservedConfig:
 
 class TestTerraformFormat:
     def test_addons_tf_is_formatted(self):
-        """addons.tf must pass terraform fmt -check."""
+        """addons.tf must pass terraform fmt -check (skipped if terraform not installed)."""
         import subprocess
+        import shutil
+        if not shutil.which("terraform"):
+            pytest.skip("terraform not installed — fmt check runs in Terraform Validate CI job")
         result = subprocess.run(
             ["terraform", "fmt", "-check", ADDONS_TF],
             capture_output=True, text=True
