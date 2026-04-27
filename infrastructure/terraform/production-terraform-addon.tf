@@ -92,10 +92,11 @@ resource "aws_s3_bucket_public_access_block" "langgraph_storage_pab" {
 
 # Secrets Manager for LangGraph Configuration
 resource "aws_secretsmanager_secret" "langgraph_secrets" {
-  name        = "${local.name}-langgraph-secrets"
-  description = "Secrets for LangGraph insurance system"
+  name                    = "${local.name}-langgraph-secrets"
+  description             = "Secrets for LangGraph insurance system"
+  recovery_window_in_days = 0 # Force-delete immediately (was in deletion window)
 
-  tags = merge(local.tags, {
+  tags = merge(local.secret_tags, {
     ManagedBy = "terraform"
   })
 }
