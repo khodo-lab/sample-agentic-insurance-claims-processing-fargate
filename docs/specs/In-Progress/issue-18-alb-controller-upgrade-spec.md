@@ -2,7 +2,7 @@
 
 **Issue:** [#18](https://github.com/khodo-lab/sample-agentic-insurance-claims-processing-fargate/issues/18)  
 **Branch:** `feature/issue-18-alb-controller-upgrade`  
-**Status:** In Progress — Phase 0 (Research) complete, Phase 1 (Requirements) awaiting approval
+**Status:** In Progress — All phases complete, ready for implementation
 
 ---
 
@@ -140,11 +140,248 @@ Amazon Inspector flagged OS-level package CVEs in the `aws-load-balancer-control
 
 ## ⛔ HARD STOP — Phase 1 Complete
 
-**The Team must review and approve the Requirements section before proceeding to Phase 2 (High-Level Design).**
+**Decisions resolved (2026-04-27):**
+1. ✅ **v2.17.1** — surgical v2.x upgrade, not v3.x
+2. ✅ **IAM patch via `source_policy_documents`** — one new action: `ec2:DescribeRouteTables`
+3. ✅ **CRD update required** — `kubectl apply` step before Helm upgrade; 2 existing CRDs need schema updates, 2 new CRDs added (ALBTargetControlConfig, GlobalAccelerator)
 
-Key decisions to confirm:
-1. **v2.17.1 vs v3.2.2** — do you want the surgical v2.x upgrade, or jump to the latest v3.x?
-2. **IAM policy approach** — patch via `source_policy_documents` in the Terraform block, or bump the module version?
-3. **CRD update approach** — manual `kubectl apply` step in the task plan, or skip if no schema changes?
+---
 
-Ready to proceed to Phase 2?
+## 2. High-Level Design
+
+### Overview
+
+Two changes to `infrastructure/terraform/addons.tf`:
+1. Bump `chart_version` from `1.8.1` → `1.17.1`
+2. Add `source_policy_documents` with the one missing IAM action (`ec2:DescribeRouteTables`)
+
+One pre-deploy step: apply updated CRDs to the cluster before `terraform apply` runs the Helm upgrade.
+
+The GitHub Actions deploy workflow handles `terraform apply` automatically on merge to main. The CRD update is a one-time manual step (or added as a pre-apply step in the workflow).
+
+### System Context
+
+```mermaid
+graph LR
+    TF[addons.tf\nchart_version: 1.17.1\n+ec2:DescribeRouteTables] -->|terraform apply| HELM[Helm upgrade\naws-load-balancer-controller\n1.8.1 → 1.17.1]
+    HELM -->|rolling update| POD[controller pod\nv2.8.1 → v2.17.1]
+    POD -->|reconciles| ALB[insurance-claims-alb\nno downtime]
+    CRD[kubectl apply CRDs\npre-upgrade] --> HELM
+```
+
+### Architectural Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Target version | v2.17.1 (chart 1.17.1) | Last v2.x release; patched OS; no major version risk |
+| IAM patch approach | `source_policy_documents` in `aws_load_balancer_controller` block | Same pattern as Karpenter in this file; no module version bump needed |
+| CRD update timing | Manual step before `terraform apply` | Helm doesn't update CRDs; must be done separately |
+| CRD update method | `kubectl apply -k` (kustomize from eks-charts) | Official method per release notes |
+
+### Major Components
+
+**`infrastructure/terraform/addons.tf`** (modified)
+- `chart_version`: `"1.8.1"` → `"1.17.1"`
+- Add `source_policy_documents` block with `ec2:DescribeRouteTables`
+
+**CRD pre-apply** (one-time manual step, or CI pre-step)
+```bash
+kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+```
+This updates `targetgroupbindings` and `ingressclassparams` schemas and adds `albtargetcontrolconfigs` and `globalaccelerators` CRDs.
+
+### Data Flow
+
+No data flow changes — the controller continues reconciling the same `insurance-claims-ingress` Ingress resource. The ALB, listeners, target groups, and routing rules are unchanged.
+
+### Security Concerns
+
+- Adding `ec2:DescribeRouteTables` is read-only and additive — no new write permissions
+- The new CRDs (ALBTargetControlConfig, GlobalAccelerator) are not used and pose no risk
+- Old image `v2.8.1` is a public ECR image — it's not in private ECR, so there's no image to delete. The Inspector finding will close automatically once the pod is no longer running the old image digest (Inspector tracks running containers, not ECR images)
+
+### Infrastructure
+
+Files changed:
+- `infrastructure/terraform/addons.tf` — 2 changes (chart_version + source_policy_documents)
+
+No new AWS resources created. The IRSA role policy gets a new version with the additional action.
+
+### Risks and Mitigations
+
+| Risk | Mitigation |
+|------|-----------|
+| Helm upgrade fails, no auto-rollback | Have `helm rollback aws-load-balancer-controller -n kube-system` ready; `wait=false` means Terraform won't catch it |
+| CRDs not applied before Helm upgrade | Apply CRDs as first task; verify with `kubectl get crds` before running `terraform apply` |
+| `enableServiceMutatorWebhook=false` accidentally dropped | Preserved in the `set[]` block — no change to that block |
+| ALB downtime | None expected — ALB is AWS-managed, independent of controller pod |
+
+---
+
+## 3. Low-Level Design
+
+### Component Design
+
+#### `infrastructure/terraform/addons.tf` — exact diff
+
+```hcl
+# BEFORE
+aws_load_balancer_controller = {
+  chart_version   = "1.8.1"
+  ...
+}
+
+# AFTER
+aws_load_balancer_controller = {
+  chart_version   = "1.17.1"   # ← bumped
+  ...
+  source_policy_documents = [   # ← added
+    data.aws_iam_policy_document.alb_controller_extra_policy.json
+  ]
+}
+```
+
+New data source (add to `addons.tf` or a new `alb-controller-policy.tf`):
+```hcl
+data "aws_iam_policy_document" "alb_controller_extra_policy" {
+  statement {
+    effect    = "Allow"
+    actions   = ["ec2:DescribeRouteTables"]
+    resources = ["*"]
+  }
+}
+```
+
+#### CRD pre-apply command
+
+```bash
+kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+```
+
+Expected output — 4 CRDs configured/created:
+```
+customresourcedefinition.apiextensions.k8s.io/ingressclassparams.elbv2.k8s.aws configured
+customresourcedefinition.apiextensions.k8s.io/targetgroupbindings.elbv2.k8s.aws configured
+customresourcedefinition.apiextensions.k8s.io/albtargetcontrolconfigs.elbv2.k8s.aws created
+customresourcedefinition.apiextensions.k8s.io/globalaccelerators.aga.k8s.aws created
+```
+
+### Interface Contracts
+
+**Helm chart 1.17.1 `set[]` values — all preserved unchanged:**
+- `enableServiceMutatorWebhook=false` ✅
+- `resources.limits.cpu=200m` ✅
+- `resources.limits.memory=512Mi` ✅
+- `resources.requests.cpu=100m` ✅
+- `resources.requests.memory=256Mi` ✅
+
+### Error Handling Strategy
+
+| Failure | Detection | Recovery |
+|---------|-----------|----------|
+| Helm upgrade fails | `helm status aws-load-balancer-controller -n kube-system` shows `failed` | `helm rollback aws-load-balancer-controller -n kube-system` |
+| Pod CrashLoopBackOff after upgrade | `kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller` | Check logs; likely IAM issue → verify `ec2:DescribeRouteTables` was applied |
+| AccessDenied in controller logs | `kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller` | Add missing action to `alb_controller_extra_policy` data source |
+| CRDs not applied before Helm | Controller logs show CRD errors | Apply CRDs manually, then `helm rollback` + re-apply |
+
+---
+
+## 4. Task Plan
+
+### Progress Summary
+
+0 of 5 tasks complete.
+
+### Task Status
+
+| # | Task | Status | Depends On | Wave |
+|---|------|--------|-----------|------|
+| 1 | Apply updated CRDs to cluster (manual pre-step) | ⬜ Todo | — | 1 |
+| 2 | Update `addons.tf`: bump `chart_version` to `1.17.1`, add `source_policy_documents` with `ec2:DescribeRouteTables` | ⬜ Todo | — | 1 |
+| 3 | Commit, push, open PR → CI passes | ⬜ Todo | 2 | 2 |
+| 4 | Merge to main → deploy workflow runs `terraform apply` → Helm upgrade executes | ⬜ Todo | 1, 3 | 3 |
+| 5 | Deployment validation: verify pod Running, no AccessDenied logs, all 4 portals return 200 | ⬜ Todo | 4 | 4 |
+
+### Dependency Graph
+
+```mermaid
+graph LR
+    T1[1. Apply CRDs] --> T4[4. Merge + deploy]
+    T2[2. Update addons.tf] --> T3[3. PR + CI]
+    T3 --> T4
+    T4 --> T5[5. Validate]
+```
+
+### Wave Summary
+
+- **Wave 1** (parallel): Task 1 (manual CRD apply) + Task 2 (code change) — no dependencies between them
+- **Wave 2**: Task 3 — PR and CI
+- **Wave 3**: Task 4 — merge and deploy
+- **Wave 4**: Task 5 — validation
+
+### Detailed Task Definitions
+
+---
+
+**Task 1 — Apply updated CRDs (manual, run locally before merge)**
+
+```bash
+kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+```
+
+Verify: `kubectl get crds | grep elbv2` should show 3 CRDs; `kubectl get crds | grep aga` should show 1 CRD.
+
+Acceptance: All 4 CRDs present in cluster.
+
+---
+
+**Task 2 — Update `addons.tf`**
+
+Changes:
+1. `chart_version = "1.8.1"` → `chart_version = "1.17.1"`
+2. Add `source_policy_documents` block referencing new data source
+3. Add `data "aws_iam_policy_document" "alb_controller_extra_policy"` with `ec2:DescribeRouteTables`
+
+Acceptance: `terraform plan` shows only the Helm release and IAM policy version changing. No resource replacements.
+
+---
+
+**Task 3 — Commit, push, open PR**
+
+Branch: `feature/issue-18-alb-controller-upgrade` (already exists)
+
+Acceptance: CI passes (lint + test + terraform fmt).
+
+---
+
+**Task 4 — Merge to main → deploy**
+
+Merge PR → GitHub Actions deploy workflow runs → `terraform apply` executes Helm upgrade.
+
+Since `wait=false`, Terraform completes quickly. Manually verify pod status after apply:
+```bash
+kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=20
+```
+
+Acceptance: Deploy workflow succeeds; controller pod Running with image `v2.17.1`.
+
+---
+
+**Task 5 — Deployment validation** ⚠️ Required final task
+
+```bash
+# Pod healthy
+kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+# No AccessDenied in logs
+kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50 | grep -i "error\|denied"
+# Ingress still has ALB address
+kubectl get ingress insurance-claims-ingress -n insurance-claims
+# All portals return 200
+for p in /claimant /adjuster /siu /supervisor; do
+  echo "$p → $(curl -s -o /dev/null -w '%{http_code}' http://insurance-claims-alb-1814481405.us-west-2.elb.amazonaws.com$p)"
+done
+```
+
+Acceptance: Pod Running, no errors in logs, all 4 portals return 200, Inspector finding addressed.
+
