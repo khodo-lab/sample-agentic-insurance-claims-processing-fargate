@@ -47,6 +47,8 @@ spec:
       labels:
         app: mongodb
     spec:
+      securityContext:
+        fsGroup: 999  # Ensures mounted volumes are writable by MongoDB user
       nodeSelector:
         karpenter.sh/nodepool: cpu-nodepool
       containers:
@@ -78,6 +80,8 @@ spec:
         volumeMounts:
         - name: mongodb-storage
           mountPath: /data/db
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             memory: "256Mi"
@@ -109,6 +113,8 @@ spec:
       - name: mongodb-storage
         persistentVolumeClaim:
           claimName: mongodb-pvc
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -1,5 +1,6 @@
 # Production-grade Autonomous Agentic System - Latest Versions
-fastapi>=0.115.0
+fastapi>=0.115.0,<0.116.0
+starlette>=0.41.0,<1.0.0
 uvicorn[standard]>=0.32.0
 pydantic>=2.10.0
 httpx>=0.28.0
