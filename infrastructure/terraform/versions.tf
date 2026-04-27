@@ -3,7 +3,7 @@
 ###############################################################
 
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
@@ -32,12 +32,4 @@ terraform {
     }
   }
 
-  # Optional: Configure remote state backend
-  # backend "s3" {
-  #   bucket         = "langgraph-insurance-terraform-state"
-  #   key            = "infrastructure/terraform.tfstate"
-  #   region         = "us-west-2"
-  #   dynamodb_table = "langgraph-insurance-terraform-lock"
-  #   encrypt        = true
-  # }
 }

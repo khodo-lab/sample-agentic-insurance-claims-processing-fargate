@@ -1,0 +1,10 @@
+[lint]
+# Ignore pre-existing violations in the application code.
+# These are tracked as tech debt and will be fixed in Issue #2 (CDK migration).
+ignore = [
+    "F401",  # unused-import
+    "F841",  # unused-variable
+    "E722",  # bare-except
+    "F541",  # f-string-missing-placeholders
+    "F811",  # redefined-while-unused
+]

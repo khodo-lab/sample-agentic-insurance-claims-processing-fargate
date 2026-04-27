@@ -71,6 +71,58 @@ cd sample-agentic-insurance-claims-processing-eks
 ./scripts/load-data.sh --policies 500 --claims 200 --clear
 ```
 
+## 🔧 CI/CD Setup (GitHub Actions + OIDC)
+
+> **Note:** This pipeline deploys the current EKS stack. It will be superseded by Issue #6 (CDK + Fargate stack).
+
+### Prerequisites
+
+- AWS CLI configured with admin credentials for account `621967485578`
+- `gh` CLI authenticated (`gh auth login`)
+- Terraform 1.10+ installed locally
+
+### One-Time Bootstrap
+
+Run this once to create the AWS prerequisites (S3 state bucket, OIDC provider, IAM deploy role):
+
+```bash
+./scripts/bootstrap-cicd.sh
+```
+
+After the EKS cluster exists, grant the deploy role cluster access:
+
+```bash
+aws eks create-access-entry \
+  --cluster-name agentic-eks-cluster \
+  --principal-arn arn:aws:iam::621967485578:role/github-actions-deploy \
+  --type STANDARD \
+  --region us-west-2
+
+aws eks associate-access-policy \
+  --cluster-name agentic-eks-cluster \
+  --principal-arn arn:aws:iam::621967485578:role/github-actions-deploy \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster \
+  --region us-west-2
+```
+
+### Workflow Overview
+
+| Workflow | Trigger | Jobs | AWS Creds? |
+|----------|---------|------|-----------|
+| `ci.yml` | PR to `main` | lint (ruff), test (pytest), terraform fmt/validate | ❌ No |
+| `deploy.yml` | Push to `main` | terraform plan+apply, docker build+push, kubectl apply, validate | ✅ OIDC |
+
+**No GitHub secrets needed** — authentication uses OIDC (keyless).
+
+Docker images are only rebuilt when `applications/` changes. Terraform-only changes skip the Docker build.
+
+### Branch Protection
+
+Enable these required status checks on `main`:
+- `Lint & Test`
+- `Terraform Validate`
+
 ## 📱 Application Portals
 
 Access via ALB URL (displayed after deployment):
