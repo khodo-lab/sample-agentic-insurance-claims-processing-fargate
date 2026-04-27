@@ -2,7 +2,78 @@
 
 **Issue:** [#7](https://github.com/khodo-lab/sample-agentic-insurance-claims-processing-fargate/issues/7)  
 **Branch:** `feature/issue-7-github-actions-oidc`  
-**Status:** In Progress — Phase 1 (Requirements) awaiting approval
+**Status:** Complete — deployed to production 2026-04-27
+
+---
+
+## Production Deployment Validation — 2026-04-27
+
+**Validated by:** Kiro  
+**Timestamp:** 2026-04-27 ~16:00 PDT  
+**ALB URL:** http://insurance-claims-alb-1814481405.us-west-2.elb.amazonaws.com
+
+### Infrastructure
+
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| EKS cluster | ✅ | `agentic-eks-cluster` ACTIVE, 4 nodes Ready |
+| Terraform state | ✅ | Plan clean, all resources applied (PRs #9–11) |
+| GitHub Actions CI | ✅ | `ci.yml` runs lint + test + terraform fmt on PRs |
+| GitHub Actions Deploy | ✅ | `deploy.yml` runs terraform + docker + kubectl on merge to main |
+| OIDC auth | ✅ | No long-lived credentials; role `github-actions-deploy` assumes via OIDC |
+| ECR repos | ✅ | 12 repos created with `scanOnPush=true` |
+
+### Application Portals (smoke test)
+
+| Portal | URL | HTTP Status |
+|--------|-----|-------------|
+| Claimant | `/claimant` | ✅ 200 |
+| Adjuster | `/adjuster` | ✅ 200 |
+| SIU | `/siu` | ✅ 200 |
+| Supervisor | `/supervisor` | ✅ 200 |
+
+### Pod Status
+
+| Service | Replicas | Status | Notes |
+|---------|----------|--------|-------|
+| claims-web-interface | 2/2 | ✅ Running | Image pushed 15:01 PDT |
+| claims-simulator | 1/1 | ✅ Running | Image pushed 15:01 PDT |
+| policy-agent | 2/2 | ✅ Running | Image pushed 15:02 PDT |
+| shared-memory | 2/2 | ✅ Running | Image pushed 15:02 PDT |
+| mongodb | 1/1 | ✅ Running | |
+| redis | 1/1 | ✅ Running | |
+| coordinator | 0/1 | ⚠️ CrashLoopBackOff | See known issue below |
+| external-integrations | 0/1 | ⚠️ CrashLoopBackOff | See known issue below |
+| ollama-service | 0/1 | ⚠️ Pending | Expected — no GPU nodes |
+
+### Known Issues (not blocking portal access)
+
+**coordinator + external-integrations: `No module named uvicorn`**
+
+Root cause: `Dockerfile.coordinator` and `Dockerfile.external-integrations` use user `insurance` (not `webapp`), copy packages to `/home/insurance/.local`, but `PYTHONUSERBASE` was set to `/home/webapp/.local` (wrong path). Python can't find the packages.
+
+Fix: change `ENV PYTHONUSERBASE=/home/webapp/.local` → `ENV PYTHONUSERBASE=/home/insurance/.local` in both Dockerfiles.
+
+This affects AI claim processing (coordinator routes) but not the portal UI itself.
+
+**ExternalSecrets IRSA not configured**
+
+`ClusterSecretStore` shows `InvalidProviderConfig` — IRSA role annotation missing on the ExternalSecrets service account. Kubernetes secrets (`mongodb-secret-external`, `langgraph-secret-external`) were created manually as a workaround. These will be lost if the namespace is recreated.
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| OIDC provider exists in account `621967485578` | ✅ |
+| Deploy IAM role scoped to `main` branch only | ✅ |
+| PR CI runs lint + test + terraform fmt | ✅ |
+| Merge to main triggers terraform + docker + kubectl | ✅ |
+| App reachable at ALB URL | ✅ |
+| No long-lived AWS credentials in GitHub secrets | ✅ |
+| Terraform state locking enabled (`use_lockfile = true`) | ✅ |
+| README documents bootstrap steps | ✅ |
+
+---
 
 ---
 
