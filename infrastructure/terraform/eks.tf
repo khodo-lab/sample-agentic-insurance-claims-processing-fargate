@@ -33,7 +33,8 @@ module "eks" {
   cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 
   # Cluster logging
-  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+  cluster_enabled_log_types   = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+  create_cloudwatch_log_group = false # Log group already exists; EKS created it on first deploy
 
   # Cluster encryption
   cluster_encryption_config = {

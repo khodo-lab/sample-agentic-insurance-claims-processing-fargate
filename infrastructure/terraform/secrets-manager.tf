@@ -14,9 +14,9 @@ resource "random_password" "mongodb_password" {
 resource "aws_secretsmanager_secret" "mongodb_credentials" {
   name                    = "${local.name}-mongodb-credentials"
   description             = "MongoDB credentials for insurance claims processing"
-  recovery_window_in_days = 7 # 7 days recovery window for production safety
+  recovery_window_in_days = 0 # Force-delete immediately (was in deletion window)
 
-  tags = merge(local.tags, {
+  tags = merge(local.secret_tags, {
     Purpose = "MongoDB Credentials"
   })
 }
@@ -53,9 +53,9 @@ resource "aws_secretsmanager_secret" "mongodb_credentials_encrypted" {
   name                    = "${local.name}-mongodb-credentials-encrypted"
   description             = "Encrypted MongoDB credentials for insurance claims processing"
   kms_key_id              = aws_kms_key.secrets_encryption.arn
-  recovery_window_in_days = 7
+  recovery_window_in_days = 0 # Force-delete immediately if needed
 
-  tags = merge(local.tags, {
+  tags = merge(local.secret_tags, {
     Purpose   = "MongoDB Credentials (Encrypted)"
     ManagedBy = "terraform"
   })

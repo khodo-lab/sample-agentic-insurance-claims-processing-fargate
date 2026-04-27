@@ -29,6 +29,17 @@ locals {
     "karpenter.sh/discovery"                      = local.cluster_name
   }
 
+  # Tags safe for Secrets Manager (strips k8s tags — SM rejects keys with '/' or '.')
+  secret_tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    Region      = var.region
+    ManagedBy   = "terraform"
+    Purpose     = "insurance-agentic-ai"
+    Owner       = "platform-team"
+    CostCenter  = "ai-ml"
+  }
+
 
 }
 
