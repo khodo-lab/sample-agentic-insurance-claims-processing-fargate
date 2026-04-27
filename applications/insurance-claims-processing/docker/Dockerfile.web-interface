@@ -46,6 +46,7 @@ COPY --chown=webapp:webapp src/static/ ./src/static/
 
 # Set environment variables
 ENV PYTHONPATH=/app
+ENV PYTHONUSERBASE=/home/webapp/.local
 ENV PYTHONUNBUFFERED=1
 ENV PATH=/home/webapp/.local/bin:$PATH
 

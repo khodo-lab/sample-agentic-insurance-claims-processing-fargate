@@ -36,6 +36,7 @@ COPY --chown=insurance:insurance src/ ./src/
 
 # Set environment variables
 ENV PYTHONPATH=/app
+ENV PYTHONUSERBASE=/home/webapp/.local
 ENV PYTHONUNBUFFERED=1
 ENV PATH=/home/insurance/.local/bin:$PATH
 
