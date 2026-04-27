@@ -1,0 +1,163 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT: "621967485578"
+  EKS_CLUSTER: agentic-eks-cluster
+  AWS_STS_REGIONAL_ENDPOINTS: regional
+  TF_LOG: ERROR
+  DEPLOY_ROLE_ARN: arn:aws:iam::621967485578:role/github-actions-deploy
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.x"
+          terraform_wrapper: false
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: infrastructure/terraform/.terraform
+          key: terraform-${{ hashFiles('infrastructure/terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Terraform Init
+        run: terraform -chdir=infrastructure/terraform init
+
+      - name: Terraform Plan
+        run: |
+          set -o pipefail
+          terraform -chdir=infrastructure/terraform plan \
+            -out=tfplan \
+            -no-color \
+            2>&1 | tee /tmp/tfplan.txt
+          # Write only the summary lines to avoid leaking sensitive attribute values
+          echo "## Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E '^(Plan:|No changes|Error|  \+|  -|  ~)' /tmp/tfplan.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform Apply
+        run: terraform -chdir=infrastructure/terraform apply -auto-approve tfplan
+
+  build-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: terraform
+    outputs:
+      images_built: ${{ steps.changes.outputs.apps }}
+      image_tag: ${{ steps.set-tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Detect application changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            apps:
+              - 'applications/**'
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          if [ "${{ steps.changes.outputs.apps }}" = "true" ]; then
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            # Use 'latest' as fallback so deploy-k8s can still reference a valid image
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.changes.outputs.apps == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Login to ECR
+        if: steps.changes.outputs.apps == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push images
+        if: steps.changes.outputs.apps == 'true'
+        env:
+          ECR_REGISTRY: ${{ env.AWS_ACCOUNT }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
+        run: ./scripts/build-docker-images.sh build-push
+
+      - name: Skip (no application changes)
+        if: steps.changes.outputs.apps != 'true'
+        run: |
+          echo "No changes in applications/ - skipping Docker build"
+
+  deploy-k8s:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: build-push
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Wait for EKS cluster to be active
+        run: |
+          aws eks wait cluster-active \
+            --name ${{ env.EKS_CLUSTER }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Configure kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.EKS_CLUSTER }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Kubernetes manifests
+        env:
+          ECR_REGISTRY: ${{ env.AWS_ACCOUNT }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
+        run: ./scripts/deploy-kubernetes.sh deploy
+
+      - name: Validate deployment
+        run: ./scripts/validate-deployment.sh

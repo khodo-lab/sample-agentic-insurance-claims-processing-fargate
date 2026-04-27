@@ -79,6 +79,15 @@ class TestVersionsTf:
         assert len(uncommented_backend) == 0, \
             "versions.tf must not contain an uncommented backend block (it belongs in backend.tf)"
 
+    def test_has_closing_brace(self):
+        """versions.tf terraform block must be properly closed."""
+        content = self._read()
+        # Count opening and closing braces — they must balance
+        opens = content.count('{')
+        closes = content.count('}')
+        assert opens == closes, \
+            f"versions.tf has unbalanced braces: {opens} open, {closes} close"
+
 
 # ---------------------------------------------------------------------------
 # Task 2: bootstrap-cicd.sh
@@ -161,6 +170,13 @@ class TestBootstrapScript:
         content = self._read()
         assert "sts.amazonaws.com" in content, \
             "OIDC provider audience must be sts.amazonaws.com"
+
+    def test_sts_permissions(self):
+        content = self._read()
+        assert "sts:AssumeRole" in content, \
+            "bootstrap script must grant sts:AssumeRole for IRSA role chains"
+        assert "sts:TagSession" in content, \
+            "bootstrap script must grant sts:TagSession (required by AWS provider >= 5.x)"
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +266,23 @@ class TestCiWorkflow:
         with open(self._path()) as f:
             raw = f.read()
         assert "pytest" in raw, "ci.yml must run pytest"
+
+    def test_no_pip_install_or_true(self):
+        """pip install must not use || true — it hides real failures."""
+        with open(self._path()) as f:
+            raw = f.read()
+        assert "pip install" not in raw or "|| true" not in raw, \
+            "ci.yml must not use '|| true' on pip install (hides failures)"
+
+    def test_fetch_depth_1(self):
+        """Checkouts should use fetch-depth: 1 for performance."""
+        doc = self._load()
+        for job_name, job in doc.get("jobs", {}).items():
+            for step in job.get("steps", []):
+                if step.get("uses", "").startswith("actions/checkout"):
+                    fetch_depth = step.get("with", {}).get("fetch-depth")
+                    assert fetch_depth == 1, \
+                        f"Job {job_name} checkout should use fetch-depth: 1"
 
 
 # ---------------------------------------------------------------------------
@@ -377,3 +410,51 @@ class TestDeployWorkflow:
             raw = f.read()
         assert "--include-gpu" not in raw, \
             "deploy.yml must not pass --include-gpu (no GPU runners)"
+
+    def test_deploy_role_arn_in_env(self):
+        """DEPLOY_ROLE_ARN must be in top-level env to avoid repetition."""
+        doc = self._load()
+        env = doc.get("env", {})
+        assert "DEPLOY_ROLE_ARN" in env, \
+            "deploy.yml must define DEPLOY_ROLE_ARN in top-level env block"
+
+    def test_image_tag_fallback_for_infra_only_push(self):
+        """deploy-k8s must use a fallback image tag when build was skipped."""
+        with open(self._path()) as f:
+            raw = f.read()
+        assert "latest" in raw or "image_tag" in raw, \
+            "deploy.yml must handle infra-only pushes with a fallback image tag"
+        assert "needs.build-push.outputs" in raw, \
+            "deploy-k8s must consume image_tag from build-push job outputs"
+
+    def test_eks_wait_cluster_active(self):
+        """deploy-k8s must wait for EKS cluster to be active before kubectl."""
+        with open(self._path()) as f:
+            raw = f.read()
+        assert "wait cluster-active" in raw or "cluster-active" in raw, \
+            "deploy.yml must wait for EKS cluster-active before kubectl steps"
+
+    def test_terraform_plan_summary_not_full_output(self):
+        """Terraform plan must not dump full output to Step Summary (secret leak risk)."""
+        with open(self._path()) as f:
+            raw = f.read()
+        # Should NOT cat the full plan file
+        assert "cat /tmp/tfplan.txt >> $GITHUB_STEP_SUMMARY" not in raw, \
+            "deploy.yml must not write full terraform plan to Step Summary (leaks secrets)"
+
+    def test_fetch_depth_1(self):
+        """Checkouts should use fetch-depth: 1 for performance."""
+        doc = self._load()
+        for job_name, job in doc.get("jobs", {}).items():
+            for step in job.get("steps", []):
+                if step.get("uses", "").startswith("actions/checkout"):
+                    fetch_depth = step.get("with", {}).get("fetch-depth")
+                    assert fetch_depth == 1, \
+                        f"Job {job_name} checkout should use fetch-depth: 1"
+
+    def test_terraform_provider_cache(self):
+        """deploy.yml should cache Terraform providers for performance."""
+        with open(self._path()) as f:
+            raw = f.read()
+        assert "actions/cache" in raw and ".terraform" in raw, \
+            "deploy.yml should cache .terraform directory for faster runs"

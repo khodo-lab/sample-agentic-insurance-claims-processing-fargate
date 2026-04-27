@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install test dependencies
+        run: pip install ruff pytest pyyaml
+
+      - name: Lint (ruff)
+        run: ruff check applications/
+
+      - name: Test
+        run: |
+          pytest applications/insurance-claims-processing/tests/ \
+            -x -q \
+            --ignore=applications/insurance-claims-processing/tests/integration
+
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.x"
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: infrastructure/terraform/.terraform
+          key: terraform-${{ hashFiles('infrastructure/terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - name: Terraform Format Check
+        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+
+      - name: Terraform Init (no backend)
+        run: terraform -chdir=infrastructure/terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform -chdir=infrastructure/terraform validate
