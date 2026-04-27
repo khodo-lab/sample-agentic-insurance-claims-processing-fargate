@@ -9,7 +9,7 @@ Persistent learnings loaded every session.
 High-signal facts that will bite you if forgotten. Keep this under 15 entries.
 
 - **GitHub repo**: `khodo-lab/sample-agentic-insurance-claims-processing-fargate` — GitHub user `hodok-aws`
-- **AWS account**: `597088050001`, region `us-west-2` — credentials via Isengard (`hodok-Isengard` assumed role)
+- **AWS account**: `621967485578`, region `us-west-2` — credentials via Isengard (`hodok-Isengard` assumed role)
 - **Target architecture** (decided 2026-04-24): CDK TypeScript + Fargate (2 services) + DynamoDB + ElastiCache Redis + Strands/AgentCore (Claude Sonnet 4.5). See ADRs 01–04 in `docs/adr/`.
 - **Issue dependency chain**: #2 (CDK) → #3 (Fargate) + #4 (DynamoDB) in parallel → #5 (Strands/AgentCore) → #6 (GitHub Actions for new stack). Issue #7 (GitHub Actions for current stack) is unblocked and can start immediately.
 - **Never commit directly to `main`** — always branch + PR.
@@ -36,7 +36,9 @@ Grouped by area. Check the relevant section before working in that area.
 - #4: MongoDB → DynamoDB (blocked by #2)
 - #5: LangGraph/Ollama → Strands + AgentCore (blocked by #2, #3)
 - #6: GitHub Actions for new CDK/Fargate stack (blocked by #2, #3)
-- **#7: GitHub Actions + OIDC for current stack — IN PROGRESS, spec complete, implement next**
+- **#7: GitHub Actions + OIDC for current stack — COMPLETE ✅ (PRs #9–16 merged)**
+- **#17: Upgrade torch to fix 5 Dependabot CVEs (1 Critical) — unblocked**
+- **#18: Upgrade aws-load-balancer-controller (Inspector OS CVE finding) — unblocked**
 - PR #1: Merged ✅
 
 ### Kiro Configuration
@@ -63,10 +65,27 @@ Grouped by area. Check the relevant section before working in that area.
 - `validate-deployment.sh`: no args, hardcoded namespace `insurance-claims`, exits non-zero on failure
 
 ### Issue #7 — Infrastructure Gotchas (verified 2026-04-27)
-- S3 state bucket `agentic-eks-terraform-state` does NOT exist — must be created by bootstrap script before first `terraform init`
-- Terraform `use_lockfile = true` requires `>= 1.10`; current constraint was `>= 1.9`; stale commented-out backend block in `versions.tf` must be removed
+- S3 state bucket `agentic-eks-terraform-state-621967485578` (account-scoped name) — created by bootstrap script
+- Terraform `use_lockfile = true` requires `>= 1.10`; lock file committed at `infrastructure/terraform/.terraform.lock.hcl` with `linux_amd64` checksums for CI
 - `providers.tf` uses `aws.virginia` alias for ECR Public (Karpenter Helm chart) — deploy role needs `ecr-public:GetAuthorizationToken` in us-east-1
 - OIDC sub-claim for push to main: `repo:khodo-lab/...:ref:refs/heads/main` — PR events use different sub-claim and correctly fail to assume the deploy role
+- `provider default_tags` must NOT include k8s tags (`kubernetes.io/cluster/*`, `karpenter.sh/discovery`) — Secrets Manager rejects tag keys with `/` or `.`. Use `local.base_tags` in provider, `local.tags` (adds k8s tags) only on EKS/Karpenter resources directly.
+- `terraform init -backend=false` in CI fails even with `-backend=false` because modules make AWS API calls during init. CI only runs `terraform fmt -check`; full validate happens in deploy workflow via `terraform plan`.
+- IAM role `github-actions-deploy` needs `cloudformation:*` and `events:*` in addition to the original policy (EKS blueprints addons use CloudFormation for telemetry and EventBridge for Karpenter rules).
+- Secrets in deletion window: `recovery_window_in_days = 0` alone is not enough if the secret already exists — must `aws secretsmanager restore-secret` first, then import into TF state with `terraform import`.
+- EKS CloudWatch log group `/aws/eks/{cluster}/cluster` is auto-created by EKS — set `create_cloudwatch_log_group = false` in the EKS module to prevent conflict.
+- AWS account in use is `621967485578` (not `597088050001` from earlier sessions — that was a different account).
+- Local kubectl access: add `arn:aws:iam::621967485578:role/admin` as EKS access entry with `AmazonEKSClusterAdminPolicy`.
+
+### Kubernetes / Docker Gotchas (verified 2026-04-27)
+- K8s manifests had hardcoded old account ID `123255318457` — must use `${ECR_REGISTRY}/insurance-claims/${name}:${IMAGE_TAG}` placeholders for `envsubst` substitution in `deploy-kubernetes.sh`.
+- Dockerfiles use multi-stage build with `pip install --user` → copy `/root/.local` to `/home/webapp/.local`. Must set `ENV PYTHONUSERBASE=/home/webapp/.local` in runtime stage or `python -m uvicorn` can't find packages.
+- `starlette>=1.0.0` breaks `TemplateResponse("template.html", {"request": request, ...})` — pin `starlette<1.0.0` in `requirements-production.txt`.
+- MongoDB pod needs `securityContext.fsGroup: 999` (pod-level) so PVC is writable, and an `emptyDir` volume mounted at `/tmp` when `readOnlyRootFilesystem: true`.
+- MongoDB URI password must be URL-encoded (`urllib.parse.quote_plus`) before embedding in the connection string — special chars like `:`, `!`, `#` break pymongo URI parsing.
+- Kubernetes secrets for MongoDB must include both `MONGODB_PASSWORD` (plain, for app) and `MONGO_INITDB_ROOT_PASSWORD` (plain, for MongoDB init container).
+- `torch==2.0.1` + `torchvision==0.15.2` are compatible but have 5 CVEs — tracked in issue #17.
+- ALB ingress: remove `ssl-redirect` and HTTPS listener annotations if no ACM cert is configured — otherwise ALB redirects HTTP→HTTPS and browser gets "refused to connect".
 - Model: `us.anthropic.claude-sonnet-4-5-20251101-v1:0` (cross-region inference profile)
 - AgentCore image must be `linux/arm64`
 - AgentCore cold start ~30s — use PUBLIC network mode (VPC mode cold start >30s)
