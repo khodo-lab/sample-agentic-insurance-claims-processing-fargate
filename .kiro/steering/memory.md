@@ -30,14 +30,14 @@ Grouped by area. Check the relevant section before working in that area.
 - `docs/adr/20260424-03-mongodb-to-dynamodb.md` — Why DynamoDB over MongoDB/DocumentDB
 - `docs/adr/20260424-04-terraform-to-cdk.md` — Why CDK TypeScript over Terraform
 
-### Open Issues (as of 2026-04-24)
-- #2: Terraform → CDK TypeScript (unblocked, start here)
+### Open Issues (as of 2026-04-27)
+- #2: Terraform → CDK TypeScript (unblocked)
 - #3: EKS → Fargate + ElastiCache Redis (blocked by #2)
 - #4: MongoDB → DynamoDB (blocked by #2)
 - #5: LangGraph/Ollama → Strands + AgentCore (blocked by #2, #3)
 - #6: GitHub Actions for new CDK/Fargate stack (blocked by #2, #3)
-- #7: GitHub Actions + OIDC for current stack (unblocked — deploy what exists today)
-- PR #1: Initial Kiro configuration (open, needs merge)
+- **#7: GitHub Actions + OIDC for current stack — IN PROGRESS, spec complete, implement next**
+- PR #1: Merged ✅
 
 ### Kiro Configuration
 - Ported from `titan-daws` project and adapted for Python/FastAPI/LangGraph/EKS stack
@@ -57,7 +57,16 @@ Grouped by area. Check the relevant section before working in that area.
 - Agent files (to be replaced): `langgraph_*_agent.py`
 - Database models (to be replaced): `database_models.py` (Motor/PyMongo → boto3 DynamoDB)
 
-### Strands / AgentCore
+### Issue #7 — Script Interfaces (verified 2026-04-27)
+- `build-docker-images.sh`: `IMAGE_TAG` + `ECR_REGISTRY` env vars; `build-push` command; GPU excluded by omitting `--include-gpu` (no `SKIP_GPU` env var); ECR repo creation with `scanOnPush=true` already built in
+- `deploy-kubernetes.sh`: requires `deploy` command argument + `IMAGE_TAG` + `ECR_REGISTRY` env vars
+- `validate-deployment.sh`: no args, hardcoded namespace `insurance-claims`, exits non-zero on failure
+
+### Issue #7 — Infrastructure Gotchas (verified 2026-04-27)
+- S3 state bucket `agentic-eks-terraform-state` does NOT exist — must be created by bootstrap script before first `terraform init`
+- Terraform `use_lockfile = true` requires `>= 1.10`; current constraint was `>= 1.9`; stale commented-out backend block in `versions.tf` must be removed
+- `providers.tf` uses `aws.virginia` alias for ECR Public (Karpenter Helm chart) — deploy role needs `ecr-public:GetAuthorizationToken` in us-east-1
+- OIDC sub-claim for push to main: `repo:khodo-lab/...:ref:refs/heads/main` — PR events use different sub-claim and correctly fail to assume the deploy role
 - Model: `us.anthropic.claude-sonnet-4-5-20251101-v1:0` (cross-region inference profile)
 - AgentCore image must be `linux/arm64`
 - AgentCore cold start ~30s — use PUBLIC network mode (VPC mode cold start >30s)
