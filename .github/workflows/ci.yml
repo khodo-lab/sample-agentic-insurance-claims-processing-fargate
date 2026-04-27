@@ -57,18 +57,5 @@ jobs:
       - name: Terraform Format Check
         run: terraform -chdir=infrastructure/terraform fmt -check -recursive
 
-      - name: Terraform Init (no backend)
-        run: terraform -chdir=infrastructure/terraform init -backend=false
-        env:
-          AWS_DEFAULT_REGION: us-west-2
-          # Dummy creds prevent the AWS provider from trying EC2 IMDS during init.
-          # skip_credentials_validation in providers.tf prevents STS validation.
-          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
-          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-
-      - name: Terraform Validate
-        run: terraform -chdir=infrastructure/terraform validate
-        env:
-          AWS_DEFAULT_REGION: us-west-2
-          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
-          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      # Note: terraform init + validate requires AWS credentials due to module data sources.
+      # Full validation happens in the deploy workflow via terraform plan with OIDC creds.

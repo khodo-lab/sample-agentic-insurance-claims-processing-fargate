@@ -5,10 +5,6 @@
 provider "aws" {
   region = var.region
 
-  # skip_credentials_validation allows `terraform validate` in CI without real AWS creds
-  skip_credentials_validation = true
-  skip_requesting_account_id  = true
-
   default_tags {
     tags = local.base_tags
   }
@@ -18,9 +14,6 @@ provider "aws" {
 provider "aws" {
   alias  = "virginia"
   region = "us-east-1"
-
-  skip_credentials_validation = true
-  skip_requesting_account_id  = true
 
   default_tags {
     tags = local.base_tags
