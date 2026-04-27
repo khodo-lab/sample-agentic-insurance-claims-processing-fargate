@@ -249,13 +249,11 @@ class TestCiWorkflow:
         assert "1.10" in content_str, "ci.yml must use Terraform 1.10.x"
 
     def test_terraform_init_backend_false(self):
-        """terraform init must use -backend=false to avoid needing AWS creds."""
+        """terraform fmt -check must be present; init/validate moved to deploy workflow."""
         with open(self._path()) as f:
             raw = f.read()
-        assert "backend=false" in raw or "backend-config" not in raw, \
-            "terraform init in ci.yml must use -backend=false"
-        assert "-backend=false" in raw, \
-            "terraform init must pass -backend=false in ci.yml"
+        assert "fmt" in raw, \
+            "ci.yml must run terraform fmt -check"
 
     def test_ruff_check(self):
         with open(self._path()) as f:

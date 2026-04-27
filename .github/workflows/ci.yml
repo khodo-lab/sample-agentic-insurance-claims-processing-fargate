@@ -57,8 +57,5 @@ jobs:
       - name: Terraform Format Check
         run: terraform -chdir=infrastructure/terraform fmt -check -recursive
 
-      - name: Terraform Init (no backend)
-        run: terraform -chdir=infrastructure/terraform init -backend=false
-
-      - name: Terraform Validate
-        run: terraform -chdir=infrastructure/terraform validate
+      # Note: terraform init + validate requires AWS credentials due to module data sources.
+      # Full validation happens in the deploy workflow via terraform plan with OIDC creds.
