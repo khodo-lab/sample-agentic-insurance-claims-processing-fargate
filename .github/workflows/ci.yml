@@ -59,6 +59,10 @@ jobs:
 
       - name: Terraform Init (no backend)
         run: terraform -chdir=infrastructure/terraform init -backend=false
+        env:
+          AWS_DEFAULT_REGION: us-west-2
+          AWS_ACCESS_KEY_ID: placeholder
+          AWS_SECRET_ACCESS_KEY: placeholder
 
       - name: Terraform Validate
         run: terraform -chdir=infrastructure/terraform validate
