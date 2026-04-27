@@ -8,7 +8,7 @@ numpy==1.24.3
 scipy==1.11.1
 
 # Deep Learning (optional)
-torch>=2.8.0
+torch==2.0.1
 torchvision==0.15.2
 
 # Time Series Analysis
