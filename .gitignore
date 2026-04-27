@@ -68,3 +68,4 @@ logs/
 .kiro/context/
 .kiro/telemetry/
 docs/reviews/
+kubectl
