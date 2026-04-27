@@ -39,7 +39,7 @@ class TestBackendTf:
             "use_lockfile must be set to true"
 
     def test_bucket_unchanged(self):
-        assert "agentic-eks-terraform-state" in self._read()
+        assert "agentic-eks-terraform-state-621967485578" in self._read()
 
     def test_region_unchanged(self):
         assert "us-west-2" in self._read()
@@ -115,7 +115,7 @@ class TestBootstrapScript:
 
     def test_creates_s3_bucket(self):
         content = self._read()
-        assert "agentic-eks-terraform-state" in content, \
+        assert "agentic-eks-terraform-state-621967485578" in content, \
             "bootstrap script must reference the S3 state bucket"
         assert "aws s3" in content or "s3api" in content, \
             "bootstrap script must create S3 bucket"

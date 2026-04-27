@@ -12,7 +12,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 AWS_ACCOUNT="621967485578"
 AWS_REGION="us-west-2"
-STATE_BUCKET="agentic-eks-terraform-state"
+STATE_BUCKET="agentic-eks-terraform-state-621967485578"
 OIDC_PROVIDER_URL="token.actions.githubusercontent.com"
 OIDC_AUDIENCE="sts.amazonaws.com"
 ROLE_NAME="github-actions-deploy"
