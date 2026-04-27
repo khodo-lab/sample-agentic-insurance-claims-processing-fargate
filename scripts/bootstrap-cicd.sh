@@ -279,7 +279,8 @@ PERMISSIONS_POLICY=$(cat <<'EOF'
       "Action": [
         "sts:GetCallerIdentity",
         "sts:AssumeRole",
-        "sts:TagSession"
+        "sts:TagSession",
+        "sts:GetServiceBearerToken"
       ],
       "Resource": "*"
     }
@@ -288,19 +289,13 @@ PERMISSIONS_POLICY=$(cat <<'EOF'
 EOF
 )
 
-# Check if policy already attached
-EXISTING_POLICIES=$(aws iam list-role-policies --role-name "$ROLE_NAME" --query 'PolicyNames' --output text 2>/dev/null || echo "")
+# Always upsert the policy (put-role-policy is idempotent)
+aws iam put-role-policy \
+    --role-name "$ROLE_NAME" \
+    --policy-name "deploy-permissions" \
+    --policy-document "$PERMISSIONS_POLICY"
 
-if echo "$EXISTING_POLICIES" | grep -q "deploy-permissions"; then
-    skip "Permissions policy already attached to $ROLE_NAME"
-else
-    aws iam put-role-policy \
-        --role-name "$ROLE_NAME" \
-        --policy-name "deploy-permissions" \
-        --policy-document "$PERMISSIONS_POLICY"
-
-    ok "Attached permissions policy to $ROLE_NAME"
-fi
+ok "Permissions policy attached/updated on $ROLE_NAME"
 
 # ---------------------------------------------------------------------------
 # Step 5: Update MaxSessionDuration (idempotent)

@@ -1,10 +1,5 @@
 # Production-Grade Terraform Addon for LangGraph Insurance System
 
-# Use existing LangGraph service role if it exists
-data "aws_iam_role" "langgraph_service_role" {
-  name = "${local.name}-langgraph-service-role"
-}
-
 # IAM Policy for LangGraph Services
 resource "aws_iam_policy" "langgraph_service_policy" {
   name        = "${local.name}-langgraph-service-policy"
@@ -308,11 +303,6 @@ resource "aws_security_group" "langgraph_alb" {
 }
 
 # Output important values
-output "langgraph_service_role_arn" {
-  description = "ARN of the LangGraph service IAM role"
-  value       = data.aws_iam_role.langgraph_service_role.arn
-}
-
 output "langgraph_storage_bucket" {
   description = "Name of the LangGraph S3 storage bucket"
   value       = aws_s3_bucket.langgraph_storage.bucket
