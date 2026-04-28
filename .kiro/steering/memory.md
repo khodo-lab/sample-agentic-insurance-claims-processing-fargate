@@ -38,7 +38,10 @@ Grouped by area. Check the relevant section before working in that area.
 - #6: GitHub Actions for new CDK/Fargate stack (blocked by #2, #3)
 - **#7: GitHub Actions + OIDC for current stack — COMPLETE ✅ (PRs #9–16 merged)**
 - **#17: Upgrade torch to fix 5 Dependabot CVEs (1 Critical) — unblocked**
-- **#18: Upgrade aws-load-balancer-controller (Inspector OS CVE finding) — unblocked**
+- **#18: Upgrade aws-load-balancer-controller — COMPLETE ✅ (PR #22 merged, deployed)**
+- **#20: coordinator crash (PYTHONUSERBASE wrong user) — unblocked**
+- **#21: ExternalSecrets IRSA not wired up — unblocked**
+- **#24: Mirador PVRE OS patching (EC2 i-026adde3dd7224006) — unblocked**
 - PR #1: Merged ✅
 
 ### Kiro Configuration
@@ -86,6 +89,12 @@ Grouped by area. Check the relevant section before working in that area.
 - Kubernetes secrets for MongoDB must include both `MONGODB_PASSWORD` (plain, for app) and `MONGO_INITDB_ROOT_PASSWORD` (plain, for MongoDB init container).
 - `torch==2.0.1` + `torchvision==0.15.2` are compatible but have 5 CVEs — tracked in issue #17.
 - ALB ingress: remove `ssl-redirect` and HTTPS listener annotations if no ACM cert is configured — otherwise ALB redirects HTTP→HTTPS and browser gets "refused to connect".
+- ALB controller v2.17.1 requires `ec2:DescribeRouteTables` — added via `source_policy_documents` in `addons.tf`. The eks-blueprints-addons module (~> 1.20) does NOT auto-update the IRSA policy on chart version bump.
+- CRDs for ALB controller must be applied manually before Helm upgrade: `kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=aws-load-balancer-controller-1.17.1"`. Not automated in CI.
+- `github-actions-deploy` role is the EKS cluster creator — its access entry is managed by the EKS module's `cluster_creator` slot. Local `terraform plan` (as `admin`) will show a replace for this entry — expected, CI plan is clean.
+- `admin` role access entry must be added manually after cluster creation for local kubectl — not managed by Terraform.
+- `./kubectl` binary in repo root (gitignored) — re-download: `curl -LO https://dl.k8s.io/release/v1.33.0/bin/darwin/arm64/kubectl && chmod +x kubectl`
+- `security` GitHub label created (was missing — only `migration` and `infrastructure` existed before).
 - Model: `us.anthropic.claude-sonnet-4-5-20251101-v1:0` (cross-region inference profile)
 - AgentCore image must be `linux/arm64`
 - AgentCore cold start ~30s — use PUBLIC network mode (VPC mode cold start >30s)
