@@ -50,7 +50,8 @@ resource "aws_iam_policy" "langgraph_service_policy" {
 
 # S3 Bucket for LangGraph Storage
 resource "aws_s3_bucket" "langgraph_storage" {
-  bucket = "${local.name}-langgraph-storage-${random_string.bucket_suffix.result}"
+  bucket        = "${local.name}-langgraph-storage-${random_string.bucket_suffix.result}"
+  force_destroy = true # Required for terraform destroy to succeed on versioned bucket
 
   tags = local.tags
 }
