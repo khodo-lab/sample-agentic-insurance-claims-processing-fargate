@@ -1,16 +1,20 @@
-# AI-Powered Insurance Claims Processing on AWS EKS
+# AI-Powered Insurance Claims Processing on AWS
 
 <p align="center">
-  <img src="https://img.shields.io/badge/AWS-EKS-FF9900?logo=amazon-aws&logoColor=white" alt="AWS EKS"/>
-  <img src="https://img.shields.io/badge/Kubernetes-1.33-326CE5?logo=kubernetes&logoColor=white" alt="Kubernetes"/>
-  <img src="https://img.shields.io/badge/Terraform-1.5+-7B42BC?logo=terraform&logoColor=white" alt="Terraform"/>
+  <img src="https://img.shields.io/badge/AWS-Fargate-FF9900?logo=amazon-aws&logoColor=white" alt="AWS Fargate"/>
+  <img src="https://img.shields.io/badge/CDK-TypeScript-3178C6?logo=typescript&logoColor=white" alt="CDK TypeScript"/>
   <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python"/>
-  <img src="https://img.shields.io/badge/MongoDB-6.0-47A248?logo=mongodb&logoColor=white" alt="MongoDB"/>
+  <img src="https://img.shields.io/badge/Amazon_Bedrock-AgentCore-FF9900?logo=amazon-aws&logoColor=white" alt="Amazon Bedrock AgentCore"/>
+  <img src="https://img.shields.io/badge/DynamoDB-blue?logo=amazon-dynamodb&logoColor=white" alt="DynamoDB"/>
 </p>
+
+> **⚠️ Migration in Progress** — The EKS/Terraform/MongoDB/Ollama stack has been torn down (2026-05-04, issue #25).
+> The repository is being migrated to **CDK TypeScript + Fargate + DynamoDB + Bedrock AgentCore** (issues #2–#6).
+> The application source code in `applications/` carries forward to the new stack.
 
 ## 🎯 Overview
 
-A **production-ready** AI-powered insurance claims processing application demonstrating advanced multi-agent AI patterns with LangGraph on AWS EKS. This repository showcases intelligent, autonomous decision-making systems for insurance claims adjudication with fraud detection.
+An AI-powered insurance claims processing application demonstrating advanced multi-agent AI patterns with Amazon Bedrock AgentCore on AWS Fargate. This repository showcases intelligent, autonomous decision-making systems for insurance claims adjudication with fraud detection.
 
 ## ✨ Key Features
 
@@ -24,15 +28,16 @@ A **production-ready** AI-powered insurance claims processing application demons
 
 ## 🚀 Quick Start
 
-### Prerequisites
+> **Note:** The EKS/Terraform stack has been torn down (issue #25, 2026-05-04). The CDK + Fargate stack is under active development (issues #2–#6). Deployment instructions will be updated when the new stack is ready.
+
+### Prerequisites (CDK migration — issues #2–#6)
 
 ```bash
 # Required tools
 - AWS CLI (configured with credentials)
-- kubectl (v1.27+)
-- Terraform (v1.5+)
+- Node.js 18+ (for CDK TypeScript)
+- AWS CDK v2
 - Docker (v20.10+)
-- jq
 ```
 
 ### One-Command Deployment
@@ -241,17 +246,17 @@ The Supervisor Portal provides enterprise-grade analytics:
 
 ## 🛠️ Technology Stack
 
+> **Note:** The table below reflects the **target architecture** (CDK + Fargate migration in progress). The previous EKS/Terraform/MongoDB/Ollama stack was torn down 2026-05-04 (issue #25).
+
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Orchestration** | AWS EKS | Managed Kubernetes |
-| **IaC** | Terraform | Infrastructure as Code |
-| **Compute** | Karpenter | Node auto-scaling |
-| **Networking** | AWS VPC + ALB | Load balancing & routing |
-| **AI Framework** | LangGraph | Agentic workflows |
-| **LLM** | Ollama (Qwen2.5) | Local LLM inference |
-| **Database** | MongoDB | Document storage |
-| **Cache** | Redis | Session & response caching |
-| **Backend** | FastAPI + Python | Web services |
+| **Orchestration** | AWS Fargate (ECS) | Serverless containers — no node management |
+| **IaC** | CDK TypeScript | Infrastructure as Code |
+| **AI Framework** | Strands + Bedrock AgentCore | Agentic workflows |
+| **LLM** | Claude Sonnet 4.5 (Bedrock) | AI inference |
+| **Database** | DynamoDB | Document storage for claims, policies |
+| **Cache** | ElastiCache Redis | Session & response caching |
+| **Backend** | FastAPI + Python 3.11 | Web services |
 | **Monitoring** | CloudWatch | Metrics & logging |
 | **Secrets** | AWS Secrets Manager | Credential management |
 

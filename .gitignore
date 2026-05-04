@@ -69,3 +69,4 @@ logs/
 .kiro/telemetry/
 docs/reviews/
 kubectl
+destroy.plan
