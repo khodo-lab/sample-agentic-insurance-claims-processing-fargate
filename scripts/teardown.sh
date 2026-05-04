@@ -95,10 +95,12 @@ phase_pre_drain() {
     warn "No EC2NodeClasses found"
 
   log "Waiting for Karpenter-provisioned EC2 nodes to terminate (max 5 min)..."
+  # Use karpenter.sh/nodepool tag — NOT karpenter.sh/discovery, which is also
+  # applied to managed node group instances via the node security group.
   for i in $(seq 1 30); do
     COUNT=$(aws ec2 describe-instances --region "$REGION" \
       --filters \
-        "Name=tag:karpenter.sh/discovery,Values=$CLUSTER" \
+        "Name=tag-key,Values=karpenter.sh/nodepool" \
         "Name=instance-state-name,Values=running,pending,stopping,shutting-down" \
       --query 'length(Reservations[*].Instances[*])' --output text 2>/dev/null || echo "0")
     if [[ "$COUNT" -eq 0 ]]; then
@@ -113,7 +115,7 @@ phase_pre_drain() {
   log "Pre-drain complete. Verifying no blockers remain..."
   KARPENTER_NODES=$(aws ec2 describe-instances --region "$REGION" \
     --filters \
-      "Name=tag:karpenter.sh/discovery,Values=$CLUSTER" \
+      "Name=tag-key,Values=karpenter.sh/nodepool" \
       "Name=instance-state-name,Values=running,pending" \
     --query 'length(Reservations[*].Instances[*])' --output text 2>/dev/null || echo "0")
   ALB_COUNT=$(aws elbv2 describe-load-balancers --region "$REGION" \
@@ -248,7 +250,7 @@ phase_verify() {
 
   check "No Karpenter EC2 nodes running" \
     "$(aws ec2 describe-instances --region "$REGION" \
-      --filters "Name=tag:karpenter.sh/discovery,Values=$CLUSTER" "Name=instance-state-name,Values=running,pending" \
+      --filters "Name=tag-key,Values=karpenter.sh/nodepool" "Name=instance-state-name,Values=running,pending" \
       --query 'Reservations[*].Instances[*].InstanceId' --output text 2>/dev/null || true)" \
     "empty"
 
